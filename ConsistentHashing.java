@@ -1,125 +1,149 @@
 package ConsistentHashing;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.Scanner;
-
+import java.util.*;
+class Pair{
+    String loc;
+    int code;
+    Pair(String loc, int code){
+        this.loc = loc;
+        this.code = code;
+    }
+}
 public class ConsistentHashing {
     public int[] solve(String[] A, String[] B, int[] C) {
         int n = C.length;
         HashMap<String, Integer> serverHashMap = new HashMap<>();
-        HashMap<Integer, ArrayList<Integer>> serverUserMap = new HashMap<>();
-        ArrayList<Integer> serverHashPositions = new ArrayList<>();
+//        HashSet<Integer> hashRingLocation = new HashSet<>();
+        HashMap<String, ArrayList<Pair>> serverUserMap = new HashMap<>();
+        ArrayList<Pair> serverHashPositions = new ArrayList<>();
         int[] result = new int[n];
 
         for(int i=0;i<n;i++){
             System.out.println("Executing step: "+(i+1));
             int code = userHash(B[i], C[i]);
             String operation = A[i];
-            int insertPos, insertMapPos, removePos;
-            int serverID;
             if(operation.equals("ASSIGN")){
                 System.out.println("Assigning");
                 System.out.println("Current Server Hash positions: "+serverHashPositions);
-                System.out.println("Current Server Hash Map: "+serverHashMap);
+//                System.out.println("Current Server Hash Map: "+serverHashMap);
                 System.out.println("Current Server user Map: "+serverUserMap);
-                insertPos = getInsertPos(serverHashPositions, code);
-                if(insertPos == serverHashPositions.size()){
-                    //serve req by the 0th server
-                    serverID = serverHashPositions.get(0);
-                }else{
-                    //serve req by the insertPos' server
-                    serverID = serverHashPositions.get(insertPos);
-                }
-                System.out.println("User with hash code - "+code+" will be inserted at "+insertPos+" index and will ber served by "+serverHashMap.get(serverID)+" with hash code : "+serverID);
-                insertMapPos = getInsertPos(serverUserMap.get(serverID), code);
-                serverUserMap.get(serverID).add(insertMapPos, code);
-                serverUserMap.put(serverID, serverUserMap.get(serverID));
-                System.out.println("Updated Server User Map: "+serverUserMap);
+//                System.out.println("Current Hash Ring Locations: "+hashRingLocation);
+                Pair pair = new Pair(B[i], code);
+                assignUser(serverUserMap, serverHashPositions, pair);
                 result[i] = code;
+                System.out.println("Updated Server User Map: "+serverUserMap);
             }else if(operation.equals("ADD")){
                 System.out.println("Adding Server "+B[i]+" with Hash Code: "+code);
                 System.out.println("Current Server Hash positions: "+serverHashPositions);
                 System.out.println("Current Server Hash Map: "+serverHashMap);
                 System.out.println("Current Server user Map: "+serverUserMap);
-                if(serverHashPositions.size() == 0){
-                    serverHashPositions.add(0, code);
-                    serverUserMap.put(code, new ArrayList<Integer>());
-                    serverHashMap.put(B[i], code);
-                    insertMapPos = 0;
-                }else{
-                    serverHashMap.put(B[i], code);
-                    insertPos = getInsertPos(serverHashPositions, code);
-                    serverHashPositions.add(insertPos, code);
-                    serverUserMap.put(code, new ArrayList<Integer>());
-                    if(insertPos == serverHashPositions.size()){
-                        // server 0's load might need to be adjusted
-                        serverID = serverHashPositions.get(0);
-                        //we have to find all users having hash code greater than first server's code
-                        insertMapPos = getInsertPos(serverUserMap.get(serverID), serverID);
-                        redistributeEndLoad(serverUserMap, insertMapPos, serverID, code);
-                    }else if(insertPos == 0){
-                        // server 0's load might need to be adjusted
-                        serverID = serverHashPositions.get(0);
-                        int insertPosNewServer = getInsertPos(serverUserMap.get(serverID), code);
-                        int insertPosOldServer = getInsertPos(serverUserMap.get(serverID), serverID);
-                        redistributeFrontLoad(serverUserMap, insertPosNewServer, insertPosOldServer, serverID, code);
-                    }else{
-                        // server at insertPos' load might need to be adjusted
-                        serverID = serverHashPositions.get(insertPos);
-                        insertMapPos = getInsertPos(serverUserMap.get(serverID), code);
-                        redistributeMidLoad(serverUserMap, insertMapPos, serverID, code);
-                    }
-//                    //add server to hash code mapping
-//                    serverHashMap.put(B[i], code);
-//                    //add new server to hash mapping
-//                    serverHashPositions.add(insertPos, code);
-//                    //add the new server to map with users
-//                    serverUserMap.put(code, new ArrayList<Integer>());
-//                    //check if users need to be redistributed
-//                    insertMapPos = getInsertPos(serverUserMap.get(serverID), code);
+//                System.out.println("Current Hash Ring Locations: "+hashRingLocation);
+                Pair pair = new Pair(B[i], code);
+                serverHashMap.put(B[i], code);
+                addServer(serverUserMap, serverHashPositions, pair);
+                result[i] = serverUserMap.get(B[i]).size();
 
-                }
                 System.out.println("Updated Server Hash positions: "+serverHashPositions);
                 System.out.println("Updated Server Hash Map: "+serverHashMap);
                 System.out.println("Updated Server user Map: "+serverUserMap);
-                System.out.println(serverUserMap.get(code) +" "+serverUserMap.get(code).size());
-                result[i] = serverUserMap.get(code).size();
+//                System.out.println("Updated Hash Ring Locations: "+hashRingLocation);
+//                System.out.println(serverUserMap.get(code) +" "+serverUserMap.get(code).size());
             }else{
                 System.out.println("Removing server: "+B[i]+" with Hash code: "+serverHashMap.get(B[i]));
                 System.out.println("Current Server Hash positions: "+serverHashPositions);
                 System.out.println("Current Server Hash Map: "+serverHashMap);
                 System.out.println("Current Server user Map: "+serverUserMap);
-                code = serverHashMap.get(B[i]);
-                System.out.println("Users being served by Server ID - "+code+" : "+serverUserMap.get(code));
-                result[i] = serverUserMap.get(code).size();
-                removePos = getServerPos(serverHashPositions, code);
-                if(removePos == serverHashPositions.size() - 1){
-                    // server 0's load will increase
-                    serverID = serverHashPositions.get(0);
-                    updateBackLoad(serverUserMap, code, serverID);
-                }else{
-                    // server after removePos' load will increase
-                    serverID = serverHashPositions.get(removePos+1);
-                    updateFrontLoad(serverUserMap, code, serverID);
-                }
-                serverHashPositions.remove(removePos);
-                serverUserMap.remove(code);
+//                System.out.println("Current Hash Ring Locations: "+hashRingLocation);
+//                String server = serverHashMap.get(B[i]);
+                Pair pair = new Pair(B[i], serverHashMap.get(B[i]));
+                result[i] = serverUserMap.get(B[i]).size();
+
+                removeServer(serverUserMap, serverHashPositions, pair);
                 serverHashMap.remove(B[i]);
+//                hashRingLocation.remove(code);
+
                 System.out.println("Updated Server Hash positions: "+serverHashPositions);
                 System.out.println("Updated Server Hash Map: "+serverHashMap);
                 System.out.println("Updated Server user Map: "+serverUserMap);
+//                System.out.println("Updated Hash Ring Locations: "+hashRingLocation);
             }
+            System.out.println(Arrays.toString(result));
         }
         return result;
     }
-    int getInsertPos(ArrayList<Integer> serverHashPositions, int code){
+    void assignUser(HashMap<String, ArrayList<Pair>> serverUserMap, ArrayList<Pair> serverHashPositions, Pair pair){
+        int insertPos = getInsertPos(serverHashPositions, pair);
+        Pair server;
+        if(insertPos == serverHashPositions.size()){
+            //serve req by the 0th server
+            server = serverHashPositions.get(0);
+        }else{
+            //serve req by the insertPos' server
+            server = serverHashPositions.get(insertPos);
+        }
+        System.out.println("User with hash code - "+pair.code+" will be inserted at "+insertPos+" index and will be served by : "+server);
+        int insertMapPos = getInsertPos(serverUserMap.get(server.loc), pair);
+        serverUserMap.get(server.loc).add(insertMapPos, pair);
+    }
+    void addServer(HashMap<String, ArrayList<Pair>> serverUserMap, ArrayList<Pair> serverHashPositions, Pair pair){
+        if(serverHashPositions.size() == 0){
+            serverHashPositions.add(0, pair);
+            serverUserMap.put(pair.loc, new ArrayList<Pair>());
+        }else{
+            int insertPos = getInsertPos(serverHashPositions, pair);
+            System.out.println("Position to insert the new user: "+insertPos);
+            serverUserMap.put(pair.loc, new ArrayList<Pair>());
+            int insertMapPos;
+            Pair server;
+            if(insertPos == serverHashPositions.size()){
+                System.out.println("End "+insertPos);
+                // server 0's load might need to be adjusted
+                server = serverHashPositions.get(0);
+                //we have to find all users having hash code greater than first server's code
+//                insertMapPos = getInsertPos(serverUserMap.get(serverID), serverID);
+                int insertPosNewServer = getInsertPos(serverUserMap.get(server), pair);
+                int insertPosOldServer = getInsertPos(serverUserMap.get(server), server);
+                redistributeEndLoad(serverUserMap, insertPosNewServer, insertPosOldServer, server, pair);
+            }else if(insertPos == 0){
+                System.out.println("Start "+insertPos);
+                // server 0's load might need to be adjusted
+                server = serverHashPositions.get(0);
+                int insertPosNewServer = getInsertPos(serverUserMap.get(server), pair);
+                int insertPosOldServer = getInsertPos(serverUserMap.get(server), server);
+                redistributeFrontLoad(serverUserMap, insertPosNewServer, insertPosOldServer, server, pair);
+            }else{
+                System.out.println("Mid "+insertPos);
+                // server at insertPos' load might need to be adjusted
+                server = serverHashPositions.get(insertPos);
+                insertMapPos = getInsertPos(serverUserMap.get(server), pair);
+                redistributeMidLoad(serverUserMap, insertMapPos, server, pair);
+            }
+            serverHashPositions.add(insertPos, pair);
+        }
+    }
+    void removeServer(HashMap<String, ArrayList<Pair>> serverUserMap, ArrayList<Pair> serverHashPositions, Pair pair){
+//        System.out.println("Users being served by Server ID - "+code+" : "+serverUserMap.get(code));
+        int removePos = getServerPos(serverHashPositions, pair);
+        Pair server;
+        if(removePos == serverHashPositions.size() - 1){
+            // server 0's load will increase
+            server = serverHashPositions.get(0);
+            updateBackLoad(serverUserMap, pair, server);
+        }else{
+            // server after removePos' load will increase
+            server = serverHashPositions.get(removePos+1);
+            updateFrontLoad(serverUserMap, pair, server);
+        }
+        serverHashPositions.remove(removePos);
+        serverUserMap.remove(pair.loc);
+//        serverHashMap.remove(server);
+    }
+    int getInsertPos(ArrayList<Pair> serverHashPositions, Pair pair){
         int start = 0;
         int end = serverHashPositions.size();
         while(start < end){
             int mid = (start + end) / 2;
-            if(code < serverHashPositions.get(mid)){
+            if(pair.code < serverHashPositions.get(mid).code){
                 end = mid;
             }else{
                 start = mid + 1;
@@ -127,14 +151,14 @@ public class ConsistentHashing {
         }
         return start;
     }
-    int getServerPos(ArrayList<Integer> serverHashPositions, int code){
+    int getServerPos(ArrayList<Pair> serverHashPositions, Pair pair){
         int start = 0;
         int end = serverHashPositions.size()-1;
         while(start <= end){
             int mid = (start + end) / 2;
-            if(code < serverHashPositions.get(mid)){
+            if(pair.code < serverHashPositions.get(mid).code){
                 end = mid - 1;
-            }else if(code > serverHashPositions.get(mid)){
+            }else if(pair.code > serverHashPositions.get(mid).code){
                 start = mid + 1;
             }else{
                 return mid;
@@ -142,49 +166,50 @@ public class ConsistentHashing {
         }
         return -1;
     }
-    void redistributeEndLoad(HashMap<Integer, ArrayList<Integer>> serverUserMap, int pos, int oldServer, int newServer){
-        int n = serverUserMap.get(oldServer).size();
-        if(n == pos){
+    void redistributeEndLoad(HashMap<String, ArrayList<Pair>> serverUserMap, int newPos, int oldPos, Pair oldServer, Pair newServer){
+        int n = serverUserMap.get(oldServer.loc).size();
+        if(oldPos == 0 || oldPos == newPos){
             return;
         }
-        for(int i=pos;i<n;i++){
-            serverUserMap.get(newServer).add(serverUserMap.get(oldServer).get(i));
+        for(int i=oldPos;i<newPos;i++){
+            serverUserMap.get(newServer.loc).add(serverUserMap.get(oldServer.loc).get(i));
+            System.out.println(serverUserMap);
         }
-        serverUserMap.get(oldServer).subList(pos, n).clear();
+        serverUserMap.get(oldServer.loc).subList(oldPos, newPos).clear();
     }
-    void redistributeFrontLoad(HashMap<Integer, ArrayList<Integer>> serverUserMap, int newPos, int oldPos, int oldServer, int newServer){
-        int n = serverUserMap.get(oldServer).size();
+    void redistributeFrontLoad(HashMap<String, ArrayList<Pair>> serverUserMap, int newPos, int oldPos, Pair oldServer, Pair newServer){
+        int n = serverUserMap.get(oldServer.loc).size();
         if(newPos == 0 && oldPos == n){
             return;
         }
         for(int i=0;i<newPos;i++){
-            serverUserMap.get(newServer).add(serverUserMap.get(oldServer).get(i));
+            serverUserMap.get(newServer.loc).add(serverUserMap.get(oldServer.loc).get(i));
         }
         for(int i=oldPos;i<n;i++){
-            serverUserMap.get(newServer).add(serverUserMap.get(oldServer).get(i));
+            serverUserMap.get(newServer.loc).add(serverUserMap.get(oldServer.loc).get(i));
         }
-        serverUserMap.get(oldServer).subList(0, newPos).clear();
-        serverUserMap.get(oldServer).subList(oldPos, n).clear();
+        serverUserMap.get(oldServer.loc).subList(0, newPos).clear();
+        serverUserMap.get(oldServer.loc).subList(oldPos-newPos, n-newPos).clear();
     }
-    void redistributeMidLoad(HashMap<Integer, ArrayList<Integer>> serverUserMap, int pos, int oldServer, int newServer){
-        int n = serverUserMap.get(oldServer).size();
-        if(n == pos){
+    void redistributeMidLoad(HashMap<String, ArrayList<Pair>> serverUserMap, int pos, Pair oldServer, Pair newServer){
+        int n = serverUserMap.get(oldServer.loc).size();
+        if(pos == 0){
             return;
         }
-        for(int i=pos;i<n;i++){
-            serverUserMap.get(newServer).add(serverUserMap.get(oldServer).get(i));
+        for(int i=0;i<pos;i++){
+            serverUserMap.get(newServer.loc).add(serverUserMap.get(oldServer.loc).get(i));
         }
-        serverUserMap.get(oldServer).subList(pos, n).clear();
+        serverUserMap.get(oldServer.loc).subList(0, pos).clear();
     }
-    void updateBackLoad(HashMap<Integer, ArrayList<Integer>> serverUserMap, int currServer, int nextServer){
-        ArrayList<Integer> list = serverUserMap.get(currServer);
-        serverUserMap.get(nextServer).addAll(list);
-        serverUserMap.put(nextServer, serverUserMap.get(nextServer));
+    void updateBackLoad(HashMap<String, ArrayList<Pair>> serverUserMap, Pair currServer, Pair nextServer){
+        ArrayList<Pair> list = serverUserMap.get(currServer.loc);
+        serverUserMap.get(nextServer.loc).addAll(list);
+//        serverUserMap.put(nextServer, serverUserMap.get(nextServer));
     }
-    void updateFrontLoad(HashMap<Integer, ArrayList<Integer>> serverUserMap, int currServer, int nextServer){
-        ArrayList<Integer> list = serverUserMap.get(nextServer);
-        serverUserMap.get(currServer).addAll(list);
-        serverUserMap.put(nextServer, serverUserMap.get(currServer));
+    void updateFrontLoad(HashMap<String, ArrayList<Pair>> serverUserMap, Pair currServer, Pair nextServer){
+        ArrayList<Pair> list = serverUserMap.get(nextServer.loc);
+        serverUserMap.get(currServer.loc).addAll(list);
+        serverUserMap.put(nextServer.loc, serverUserMap.get(currServer.loc));
     }
     int userHash(String username, int hashKey){
         int p = hashKey;
@@ -206,14 +231,20 @@ public class ConsistentHashing {
         String A[] = new String[n];
         String B[] = new String[n];
         int C[] = new int[n];
-        for(int i=0;i<n;i++){
-            System.out.println("Enter Instruction");
-            A[i] = sc.nextLine();
-            System.out.println("Enter Server/User");
-            B[i] = sc.nextLine();
-            System.out.println("Enter hash key");
+        System.out.println("Enter Instruction");
+        for(int i=0;i<n;i++) {
+            A[i] = sc.next();
+        }
+        System.out.println("Enter Server/User");
+        for(int i=0;i<n;i++) {
+            B[i] = sc.next();
+        }
+        System.out.println("Enter hash key");
+        for(int i=0;i<n;i++) {
             C[i] = sc.nextInt();
-            sc.nextLine();
+        }
+        for(int i=0;i<n;i++){
+            System.out.println(A[i]+" "+B[i]+" "+C[i]);
         }
         ConsistentHashing obj = new ConsistentHashing();
         int result[] = obj.solve(A, B, C);
