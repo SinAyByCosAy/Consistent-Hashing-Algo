@@ -62,13 +62,14 @@ public class ConsistentHashing {
                     }else if(insertPos == 0){
                         // server 0's load might need to be adjusted
                         serverID = serverHashPositions.get(0);
-                        insertMapPos = getInsertPos(serverUserMap.get(serverID), code);
-                        redistributeFrontLoad(serverUserMap, );
+                        int insertPosNewServer = getInsertPos(serverUserMap.get(serverID), code);
+                        int insertPosOldServer = getInsertPos(serverUserMap.get(serverID), serverID);
+                        redistributeFrontLoad(serverUserMap, insertPosNewServer, insertPosOldServer, serverID, code);
                     }else{
                         // server at insertPos' load might need to be adjusted
                         serverID = serverHashPositions.get(insertPos);
                         insertMapPos = getInsertPos(serverUserMap.get(serverID), code);
-                        redistributeMidLoad();
+                        redistributeMidLoad(serverUserMap, insertMapPos, serverID, code);
                     }
 //                    //add server to hash code mapping
 //                    serverHashMap.put(B[i], code);
@@ -151,17 +152,21 @@ public class ConsistentHashing {
         }
         serverUserMap.get(oldServer).subList(pos, n).clear();
     }
-    void redistributeStartLoad(HashMap<Integer, ArrayList<Integer>> serverUserMap, int pos, int oldServer, int newServer){
+    void redistributeFrontLoad(HashMap<Integer, ArrayList<Integer>> serverUserMap, int newPos, int oldPos, int oldServer, int newServer){
         int n = serverUserMap.get(oldServer).size();
-        if(n == pos){
+        if(newPos == 0 && oldPos == n){
             return;
         }
-        for(int i=pos;i<n;i++){
+        for(int i=0;i<newPos;i++){
             serverUserMap.get(newServer).add(serverUserMap.get(oldServer).get(i));
         }
-        serverUserMap.get(oldServer).subList(pos, n).clear();
+        for(int i=oldPos;i<n;i++){
+            serverUserMap.get(newServer).add(serverUserMap.get(oldServer).get(i));
+        }
+        serverUserMap.get(oldServer).subList(0, newPos).clear();
+        serverUserMap.get(oldServer).subList(oldPos, n).clear();
     }
-    void redistributeEndLoad(HashMap<Integer, ArrayList<Integer>> serverUserMap, int pos, int oldServer, int newServer){
+    void redistributeMidLoad(HashMap<Integer, ArrayList<Integer>> serverUserMap, int pos, int oldServer, int newServer){
         int n = serverUserMap.get(oldServer).size();
         if(n == pos){
             return;
