@@ -80,13 +80,18 @@ public class ConsistentHashing {
     void assignUser(HashMap<String, ArrayList<Pair>> serverUserMap, ArrayList<Pair> serverHashPositions, Pair pair){
         int insertPos = getInsertPos(serverHashPositions, pair);
         Pair server;
+        int serverPos;
         if(insertPos == serverHashPositions.size()){
             //serve req by the 0th server
-            server = serverHashPositions.get(0);
+            serverPos = 0;
         }else{
             //serve req by the insertPos' server
-            server = serverHashPositions.get(insertPos);
+            serverPos = insertPos;
         }
+        while(serverPos+1 < serverHashPositions.size() && serverHashPositions.get(serverPos).code == serverHashPositions.get(serverPos+1).code){
+            serverPos++;
+        }
+        server = serverHashPositions.get(serverPos);
         System.out.println("User with hash code - "+pair.code+" will be inserted at "+insertPos+" index and will be served by : "+server);
         int insertMapPos = getInsertPos(serverUserMap.get(server.loc), pair);
         serverUserMap.get(server.loc).add(insertMapPos, pair);
@@ -102,13 +107,17 @@ public class ConsistentHashing {
             int insertMapPos;
             Pair server;
             if(insertPos == serverHashPositions.size()){
-                System.out.println("End "+insertPos);
-                // server 0's load might need to be adjusted
-                server = serverHashPositions.get(0);
-                //we have to find all users having hash code greater than first server's code
-                int insertPosNewServer = getInsertPos(serverUserMap.get(server.loc), pair);
-                int insertPosOldServer = getInsertPos(serverUserMap.get(server.loc), server);
-                redistributeEndLoad(serverUserMap, insertPosNewServer, insertPosOldServer, server, pair);
+                if(serverHashPositions.get(insertPos-1).code != pair.code){
+                    System.out.println("End " + insertPos);
+                    // server 0's load might need to be adjusted
+                    server = serverHashPositions.get(0);
+                    //we have to find all users having hash code greater than first server's code
+                    int insertPosNewServer = getInsertPos(serverUserMap.get(server.loc), pair);
+                    int insertPosOldServer = getInsertPos(serverUserMap.get(server.loc), server);
+                    redistributeEndLoad(serverUserMap, insertPosNewServer, insertPosOldServer, server, pair);
+                }else{
+                    System.out.println("Found another server at the same location");
+                }
             }else if(insertPos == 0){
                 System.out.println("Start "+insertPos);
                 // server 0's load might need to be adjusted
@@ -117,11 +126,15 @@ public class ConsistentHashing {
                 int insertPosOldServer = getInsertPos(serverUserMap.get(server.loc), server);
                 redistributeFrontLoad(serverUserMap, insertPosNewServer, insertPosOldServer, server, pair);
             }else{
-                System.out.println("Mid "+insertPos);
-                // server at insertPos' load might need to be adjusted
-                server = serverHashPositions.get(insertPos);
-                insertMapPos = getInsertPos(serverUserMap.get(server.loc), pair);
-                redistributeMidLoad(serverUserMap, insertMapPos, server, pair);
+                if(serverHashPositions.get(insertPos-1).code != pair.code) {
+                    System.out.println("Mid " + insertPos);
+                    // server at insertPos' load might need to be adjusted
+                    server = serverHashPositions.get(insertPos);
+                    insertMapPos = getInsertPos(serverUserMap.get(server.loc), pair);
+                    redistributeMidLoad(serverUserMap, insertMapPos, server, pair);
+                }else{
+                    System.out.println("Found another server at the same location");
+                }
             }
             serverHashPositions.add(insertPos, pair);
         }
