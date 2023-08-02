@@ -9,6 +9,14 @@ class Pair{
         this.code = code;
     }
 }
+class ServerPos{
+    int index;
+    Boolean found;
+    ServerPos(int index, Boolean found){
+        this.index = index;
+        this.found = found;
+    }
+}
 public class ConsistentHashing {
     public int[] solve(String[] A, String[] B, int[] C) {
         int n = C.length;
@@ -140,7 +148,18 @@ public class ConsistentHashing {
         }
     }
     void removeServer(HashMap<String, ArrayList<Pair>> serverUserMap, ArrayList<Pair> serverHashPositions, Pair pair){
-        int removePos = getServerPos(serverHashPositions, pair);
+        ServerPos serverPos = getServerPos(serverHashPositions, pair);
+        int removePos = -1;
+        if(serverPos.found){
+            removePos = serverPos.index;
+        }else{
+            for(int i=serverPos.index;i>=0;i--){
+                if(serverHashPositions.get(i).loc == pair.loc){
+                    removePos = i;
+                    break;
+                }
+            }
+        }
         Pair server;
         if(removePos == serverHashPositions.size() - 1){
             // server 0's load will increase
@@ -167,9 +186,10 @@ public class ConsistentHashing {
         }
         return start;
     }
-    int getServerPos(ArrayList<Pair> serverHashPositions, Pair pair){
+    ServerPos getServerPos(ArrayList<Pair> serverHashPositions, Pair pair){
         int start = 0;
         int end = serverHashPositions.size()-1;
+        int index = -1;
         while(start <= end){
             int mid = (start + end) / 2;
             if(pair.code < serverHashPositions.get(mid).code){
@@ -177,10 +197,13 @@ public class ConsistentHashing {
             }else if(pair.code > serverHashPositions.get(mid).code){
                 start = mid + 1;
             }else{
-                return mid;
+                if((pair.loc).equals(serverHashPositions.get(mid).loc))
+                return new ServerPos(mid, true);
+                index = mid;
+                end = mid - 1;
             }
         }
-        return -1;
+        return new ServerPos(index, false);
     }
     void redistributeEndLoad(HashMap<String, ArrayList<Pair>> serverUserMap, int newPos, int oldPos, Pair oldServer, Pair newServer){
         int n = serverUserMap.get(oldServer.loc).size();
@@ -271,7 +294,7 @@ public class ConsistentHashing {
             C[i] = sc.nextInt();
         }
         for(int i=0;i<n;i++){
-            System.out.println(A[i]+" "+B[i]+" "+C[i]);
+            System.out.println((i+1)+" -> "+A[i]+" "+B[i]+" "+C[i]);
         }
         ConsistentHashing obj = new ConsistentHashing();
         int result[] = obj.solve(A, B, C);
