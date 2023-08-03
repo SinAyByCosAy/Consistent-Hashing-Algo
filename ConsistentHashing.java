@@ -31,55 +31,20 @@ public class ConsistentHashing {
             int code = userHash(B[i], C[i]);
             String operation = A[i];
             if(operation.equals("ASSIGN")){
-                System.out.println("Assigning user with code: "+code);
-                System.out.println("Current Server Hash positions: ");
-                printServerHashPositions(serverHashPositions);
-                System.out.println("Current Server Hash Map: "+serverHashMap);
-                System.out.println("Current Server user Map: ");
-                printServerUserMap(serverUserMap);
 
                 Pair pair = new Pair(B[i], code);
                 assignUser(serverUserMap, serverHashPositions, pair);
                 result[i] = code;
-
-                System.out.println("Updated Server User Map: ");
-                printServerUserMap(serverUserMap);
             }else if(operation.equals("ADD")){
-                System.out.println("Adding Server "+B[i]+" with Hash Code: "+code);
-                System.out.println("Current Server Hash positions: ");
-                printServerHashPositions(serverHashPositions);
-                System.out.println("Current Server Hash Map: "+serverHashMap);
-                System.out.println("Current Server user Map: ");
-                printServerUserMap(serverUserMap);
-
                 Pair pair = new Pair(B[i], code);
                 serverHashMap.put(B[i], code);
                 addServer(serverUserMap, serverHashPositions, pair);
                 result[i] = serverUserMap.get(B[i]).size();
-
-                System.out.println("Updated Server Hash positions: ");
-                printServerHashPositions(serverHashPositions);
-                System.out.println("Updated Server Hash Map: "+serverHashMap);
-                System.out.println("Updated Server user Map: ");
-                printServerUserMap(serverUserMap);
             }else{
-                System.out.println("Removing server: "+B[i]+" with Hash code: "+serverHashMap.get(B[i]));
-                System.out.println("Current Server Hash positions: ");
-                printServerHashPositions(serverHashPositions);
-                System.out.println("Current Server Hash Map: "+serverHashMap);
-                System.out.println("Current Server user Map: ");
-                printServerUserMap(serverUserMap);
-
                 Pair pair = new Pair(B[i], serverHashMap.get(B[i]));
                 result[i] = serverUserMap.get(B[i]).size();
                 removeServer(serverUserMap, serverHashPositions, pair);
                 serverHashMap.remove(B[i]);
-
-                System.out.println("Updated Server Hash positions: ");
-                printServerHashPositions(serverHashPositions);
-                System.out.println("Updated Server Hash Map: "+serverHashMap);
-                System.out.println("Updated Server user Map: ");
-                printServerUserMap(serverUserMap);
             }
             System.out.println(Arrays.toString(result));
         }
@@ -103,7 +68,6 @@ public class ConsistentHashing {
             serverPos++;
         }
         server = serverHashPositions.get(serverPos);
-        System.out.println("User with hash code - "+pair.code+" will be inserted at "+insertPos+" index and will be served by : "+server);
         int insertMapPos = getInsertPos(serverUserMap.get(server.loc), pair);
         serverUserMap.get(server.loc).add(insertMapPos, pair);
     }
@@ -113,14 +77,12 @@ public class ConsistentHashing {
             serverUserMap.put(pair.loc, new ArrayList<Pair>());
         }else{
             int insertPos = getInsertPos(serverHashPositions, pair);
-            System.out.println("Position to insert the new user: "+insertPos);
             serverUserMap.put(pair.loc, new ArrayList<Pair>());
             int insertMapPos;
             Pair server;
             int serverPos;
             if(insertPos == serverHashPositions.size()){
                 if(serverHashPositions.get(insertPos-1).code != pair.code){
-                    System.out.println("End " + insertPos);
                     // server 0's load might need to be adjusted
                     //duplicate old server's load should not be redistributed when a new server is added
                     serverPos = 0;
@@ -132,11 +94,8 @@ public class ConsistentHashing {
                     int insertPosNewServer = getInsertPos(serverUserMap.get(server.loc), pair);
                     int insertPosOldServer = getInsertPos(serverUserMap.get(server.loc), server);
                     redistributeEndLoad(serverUserMap, insertPosNewServer, insertPosOldServer, server, pair);
-                }else{
-                    System.out.println("Found another server at the same location");
                 }
             }else if(insertPos == 0){
-                System.out.println("Start "+insertPos);
                 // server 0's load might need to be adjusted
                 server = serverHashPositions.get(0);
                 int insertPosNewServer = getInsertPos(serverUserMap.get(server.loc), pair);
@@ -144,7 +103,6 @@ public class ConsistentHashing {
                 redistributeFrontLoad(serverUserMap, insertPosNewServer, insertPosOldServer, server, pair);
             }else{
                 if(serverHashPositions.get(insertPos-1).code != pair.code) {
-                    System.out.println("Mid " + insertPos);
                     //duplicate old servers load shouldn't be redistributed when a new server is added
                     serverPos = insertPos;
                     while(serverPos+1 < serverHashPositions.size() && serverHashPositions.get(serverPos).code == serverHashPositions.get(serverPos+1).code){
@@ -154,8 +112,6 @@ public class ConsistentHashing {
                     server = serverHashPositions.get(serverPos);
                     insertMapPos = getInsertPos(serverUserMap.get(server.loc), pair);
                     redistributeMidLoad(serverUserMap, insertMapPos, server, pair);
-                }else{
-                    System.out.println("Found another server at the same location");
                 }
             }
             serverHashPositions.add(insertPos, pair);
@@ -190,18 +146,12 @@ public class ConsistentHashing {
                 }
             }
         }
-        Pair server;
-        if(removePos == serverHashPositions.size() - 1){
-            // server 0's load will increase
-            server = serverHashPositions.get(0);
-            updateBackLoad(serverUserMap, pair, server);
-        }else{
-            // server after removePos' load will increase
-            server = serverHashPositions.get(removePos+1);
-            updateFrontLoad(serverUserMap, pair, server);
-        }
+        ArrayList<Pair> removeList = serverUserMap.get(pair.loc);
         serverHashPositions.remove(removePos);
         serverUserMap.remove(pair.loc);
+        for(Pair addUser : removeList){
+            assignUser(serverUserMap, serverHashPositions, new Pair(addUser.loc, addUser.code));
+        }
     }
     int getInsertPos(ArrayList<Pair> serverHashPositions, Pair pair){
         int start = 0;
@@ -265,15 +215,6 @@ public class ConsistentHashing {
             serverUserMap.get(newServer.loc).add(serverUserMap.get(oldServer.loc).get(i));
         }
         serverUserMap.get(oldServer.loc).subList(0, pos).clear();
-    }
-    void updateBackLoad(HashMap<String, ArrayList<Pair>> serverUserMap, Pair currServer, Pair nextServer){
-        ArrayList<Pair> list = serverUserMap.get(currServer.loc);
-        serverUserMap.get(nextServer.loc).addAll(list);
-    }
-    void updateFrontLoad(HashMap<String, ArrayList<Pair>> serverUserMap, Pair currServer, Pair nextServer){
-        ArrayList<Pair> list = serverUserMap.get(nextServer.loc);
-        serverUserMap.get(currServer.loc).addAll(list);
-        serverUserMap.put(nextServer.loc, serverUserMap.get(currServer.loc));
     }
     int userHash(String username, int hashKey){
         int p = hashKey;
